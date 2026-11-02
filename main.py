@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 # ==============================================================================
-# 1. การกำหนดค่า Metadata และแหล่งข้อมูลภาครัฐที่อ้างอิงจริง
+# 1. กำหนดค่า Metadata แหล่งข้อมูลอ้างอิงภาครัฐ Data.go.th
 # ==============================================================================
 DATASET_METADATA = {
     "source": "องค์การสวนสัตว์แห่งประเทศไทย ในพระบรมราชูปถัมภ์ (Data.go.th)",
@@ -20,14 +20,12 @@ RESOURCE_FILE_PATH = "csv-.-..69.csv"
 DATA_GO_TH_API_URL = "https://data.go.th/api/3/action/datastore_search"
 
 # ==============================================================================
-# 2. ฟังก์ชันช่วยจัดการและดึงข้อมูลจริง (Data Loaders & Cleaning)
+# 2. ฟังก์ชันช่วยจัดการข้อมูลและการทำความสะอาด (Data Loaders & Cleaning)
 # ==============================================================================
 def clean_and_format_data(df: pd.DataFrame) -> List[Dict[str, Any]]:
-    """ทำความสะอาด DataFrame และตั้งชื่อคอลัมน์ให้อ่านง่าย"""
-    # ลบคอลัมน์ที่เป็นค่าว่าง NaN ทั้งหมด
+    """ทำความสะอาด DataFrame และแมปชื่อคอลัมน์มาตรฐาน"""
     df = df.dropna(how='all', axis=1)
 
-    # ตั้งชื่อคอลัมน์มาตรฐาน
     column_mapping = [
         "item_type", "zoo_name", "fiscal_year",
         "oct_68", "nov_68", "dec_68", "jan_69", "feb_69",
@@ -38,12 +36,10 @@ def clean_and_format_data(df: pd.DataFrame) -> List[Dict[str, Any]]:
         df = df.iloc[:, :len(column_mapping)]
         df.columns = column_mapping
 
-    # ตัดช่องว่างส่วนเกินของข้อความออก
     for col in df.columns:
         if df[col].dtype == object:
             df[col] = df[col].astype(str).str.strip()
 
-    # แปลงข้อมูลเป็น List of Dictionaries
     return df.where(pd.notnull(df), None).to_dict(orient="records")
 
 
@@ -52,14 +48,12 @@ def load_from_local_csv() -> List[Dict[str, Any]]:
     if not os.path.exists(RESOURCE_FILE_PATH):
         raise FileNotFoundError(f"ไม่พบไฟล์ทรัพยากร {RESOURCE_FILE_PATH}")
     
-    # พยายามอ่านด้วย encoding สำหรับภาษาไทยเพื่อแก้ปัญหาตัวอักษรกลายเป็น ????
     encodings_to_try = ['cp874', 'utf-8-sig', 'tis-620', 'utf-8']
     df = None
     
     for enc in encodings_to_try:
         try:
             df = pd.read_csv(RESOURCE_FILE_PATH, encoding=enc)
-            # ตรวจสอบว่าอ่านแล้วไม่เป็น ???? (ถ้านำหน้าคอลัมน์แรกแล้วไม่มี ?)
             if df.columns[0] and '?' not in str(df.columns[0]):
                 break
         except Exception:
@@ -95,11 +89,10 @@ app = FastAPI(
     title="สถิติผู้เข้าชมสวนสัตว์ ปีงบประมาณ 2569 API",
     description="RESTful API ดึงข้อมูลจริงรายงานสถิติจำนวนผู้เข้าชมสวนสัตว์ จาก Data.go.th",
     version="1.0.0",
-    docs_url="/docs",      # Swagger UI Endpoint
+    docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# รองรับ CORS สำหรับการเรียกใช้งานจากต่าง Domain
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -128,11 +121,9 @@ def get_zoo_visitors(
     ดึงข้อมูลสถิติจำนวนผู้เข้าชมสวนสัตว์ ปีงบประมาณ 2569 
     พร้อมแสดงอ้างอิงแหล่งข้อมูลภาครัฐ Data.go.th และคืนค่า JSON Response
     """
-    # 1. พยายามดึงข้อมูลสดผ่าน Live API ของ Data.go.th ก่อน
     records = fetch_from_datagoth_api(DATASET_METADATA["resource_id"])
     data_source_mode = "Data.go.th Live API"
 
-    # 2. หากดึง API ไม่สำเร็จ ให้สลับอ่านจากไฟล์ CSV ทรัพยากรจริงในเครื่อง (Fallback)
     if not records:
         try:
             records = load_from_local_csv()
@@ -145,7 +136,6 @@ def get_zoo_visitors(
     if limit and limit > 0:
         records = records[:limit]
 
-    # คืนค่า JSON Response ตามโครงสร้างที่กำหนด
     return {
         "status": "success",
         "metadata": {
@@ -158,16 +148,11 @@ def get_zoo_visitors(
     }
 
 # ==============================================================================
-# 5. [ส่วนเสริม - Optional] การสาธิตการเชื่อมต่อ MySQL ด้วย Python/FastAPI
+# 5. [Optional] ตัวอย่างการเชื่อมต่อ MySQL (กรณีมีฐานข้อมูล)
 # ==============================================================================
 @app.get("/api/demo-mysql-connect", summary="[Optional] ตัวอย่างการเชื่อมต่อ MySQL", tags=["Optional MySQL"])
 def demo_mysql_connection():
-    """
-    ฟังก์ชันสาธิตการเชื่อมต่อ MySQL (ใช้อุปกรณ์เสริม กรณีมี DB ที่ผู้สอนจัดสรรให้)
-    """
     import pymysql
-    
-    # อ่านการตั้งค่าจาก Environment Variables
     DB_HOST = os.getenv("MYSQL_HOST", "localhost")
     DB_USER = os.getenv("MYSQL_USER", "root")
     DB_PASSWORD = os.getenv("MYSQL_PASSWORD", "123456")
@@ -176,12 +161,8 @@ def demo_mysql_connection():
 
     try:
         connection = pymysql.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            port=DB_PORT,
-            cursorclass=pymysql.cursors.DictCursor
+            host=DB_HOST, user=DB_USER, password=DB_PASSWORD,
+            database=DB_NAME, port=DB_PORT, cursorclass=pymysql.cursors.DictCursor
         )
         with connection:
             with connection.cursor() as cursor:
@@ -196,12 +177,9 @@ def demo_mysql_connection():
     except Exception as e:
         return {
             "status": "connection_failed",
-            "message": f"ไม่สามารถเชื่อมต่อ MySQL ได้ (สามารถข้ามได้): {str(e)}"
+            "message": f"ไม่สามารถเชื่อมต่อ MySQL ได้: {str(e)}"
         }
 
-# ==============================================================================
-# 6. สั่งรัน Server ด้วย Uvicorn เมื่อรันไฟล์โดยตรง
-# ==============================================================================
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
