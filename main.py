@@ -5,7 +5,6 @@ from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-# Metadata อ้างอิงแหล่งข้อมูลภาครัฐ Data.go.th
 DATASET_METADATA = {
     "source": "องค์การสวนสัตว์แห่งประเทศไทย ในพระบรมราชูปถัมภ์ (Data.go.th)",
     "dataset_name": "zoo-visitors2569",
@@ -14,20 +13,18 @@ DATASET_METADATA = {
     "url": "https://data.go.th/dataset/zoo-visitors2569"
 }
 
-RESOURCE_FILE_PATH = "csv-.-..69 (1).csv"
+# กำหนดชื่อไฟล์ให้ตรงกับไฟล์ CSV บน GitHub
+RESOURCE_FILE_PATH = "csv-.-..69.csv"
 DATA_GO_TH_API_URL = "https://data.go.th/api/3/action/datastore_search"
 
 
 def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
-    """ลบคอลัมน์ว่าง และแมปชื่อคอลัมน์มาตรฐาน"""
     df = df.dropna(how='all', axis=1)
-
     column_mapping = [
         "item_type", "zoo_name", "fiscal_year",
         "oct_68", "nov_68", "dec_68", "jan_69", "feb_69",
         "mar_69", "apr_69", "may_69", "jun_69", "jul_69", "aug_69", "sep_69"
     ]
-
     if len(df.columns) >= len(column_mapping):
         df = df.iloc[:, :len(column_mapping)]
         df.columns = column_mapping
@@ -40,7 +37,6 @@ def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
 
 
 def load_local_csv() -> List[Dict[str, Any]]:
-    """อ่านข้อมูลจากไฟล์ CSV ทรัพยากรจริง"""
     if not os.path.exists(RESOURCE_FILE_PATH):
         raise FileNotFoundError(f"ไม่พบไฟล์ {RESOURCE_FILE_PATH}")
     
@@ -57,7 +53,6 @@ def load_local_csv() -> List[Dict[str, Any]]:
 
 
 def fetch_live_api(resource_id: str) -> Optional[List[Dict[str, Any]]]:
-    """ดึงข้อมูลโดยตรงจาก Data.go.th API"""
     try:
         res = requests.get(
             DATA_GO_TH_API_URL,
