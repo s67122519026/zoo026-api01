@@ -48,10 +48,26 @@ def clean_and_format_data(df: pd.DataFrame) -> List[Dict[str, Any]]:
 
 
 def load_from_local_csv() -> List[Dict[str, Any]]:
-    """อ่านข้อมูลจริงจากไฟล์ CSV ที่ดาวน์โหลดมา"""
+    """อ่านข้อมูลจริงจากไฟล์ CSV ที่ดาวน์โหลดมา พร้อมรองรับ Encoding ภาษาไทย"""
     if not os.path.exists(RESOURCE_FILE_PATH):
         raise FileNotFoundError(f"ไม่พบไฟล์ทรัพยากร {RESOURCE_FILE_PATH}")
-    df = pd.read_csv(RESOURCE_FILE_PATH)
+    
+    # พยายามอ่านด้วย encoding สำหรับภาษาไทยเพื่อแก้ปัญหาตัวอักษรกลายเป็น ????
+    encodings_to_try = ['cp874', 'utf-8-sig', 'tis-620', 'utf-8']
+    df = None
+    
+    for enc in encodings_to_try:
+        try:
+            df = pd.read_csv(RESOURCE_FILE_PATH, encoding=enc)
+            # ตรวจสอบว่าอ่านแล้วไม่เป็น ???? (ถ้านำหน้าคอลัมน์แรกแล้วไม่มี ?)
+            if df.columns[0] and '?' not in str(df.columns[0]):
+                break
+        except Exception:
+            continue
+            
+    if df is None:
+        df = pd.read_csv(RESOURCE_FILE_PATH)
+
     return clean_and_format_data(df)
 
 
