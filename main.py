@@ -23,12 +23,12 @@ PROVINCE_MAP = {
     "โครงการคชอาณาจักร จังหวัดสุรินทร์": "สุรินทร์"
 }
 
-# กำหนดชื่อไฟล์ CSV ให้อ่านจากโฟลเดอร์ปัจจุบัน
 RESOURCE_FILE_PATH = "csv-.-..69.csv"
 DATA_GO_TH_API_URL = "https://data.go.th/api/3/action/datastore_search"
 
 
 def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """ทำความสะอาด DataFrame และแมปชื่อคอลัมน์มาตรฐาน"""
     df = df.dropna(how='all', axis=1)
 
     column_mapping = [
@@ -45,21 +45,22 @@ def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
         if df[col].dtype == object:
             df[col] = df[col].astype(str).str.strip()
 
+    # เพิ่มข้อมูลจังหวัด (Province)
     df["province"] = df["zoo_name"].map(lambda x: PROVINCE_MAP.get(str(x), "ไม่ระบุ"))
 
     return df.where(pd.notnull(df), None).to_dict(orient="records")
 
 
 def load_local_csv() -> List[Dict[str, Any]]:
-    # ค้นหาไฟล์ CSV ทั้งในโฟลเดอร์ปัจจุบัน และโฟลเดอร์ย่อย
+    """อ่านข้อมูลไฟล์ CSV โดยค้นหาไฟล์อัตโนมัติในโฟลเดอร์"""
     target_path = RESOURCE_FILE_PATH
     if not os.path.exists(target_path):
-        # ค้นหาไฟล์ .csv ทุกไฟล์ที่มีอยู่ใน Repository เผื่อชื่อไฟล์ไม่ตรง
-        files = [f for f in os.listdir('.') if f.endswith('.csv')]
-        if files:
-            target_path = files[0]
+        # ค้นหาไฟล์ .csv ในโฟลเดอร์ปัจจุบัน
+        csv_files = [f for f in os.listdir('.') if f.endswith('.csv')]
+        if csv_files:
+            target_path = csv_files[0]
         else:
-            raise FileNotFoundError(f"ไม่พบไฟล์ CSV บน Server (ค้นหาชื่อ {RESOURCE_FILE_PATH})")
+            raise FileNotFoundError(f"ไม่พบไฟล์ CSV บน Repository")
 
     for enc in ['utf-8-sig', 'utf-8', 'cp874', 'tis-620']:
         try:
@@ -73,6 +74,7 @@ def load_local_csv() -> List[Dict[str, Any]]:
 
 
 def fetch_live_api(resource_id: str) -> Optional[List[Dict[str, Any]]]:
+    """ดึงข้อมูลสดผ่าน Data.go.th API"""
     try:
         res = requests.get(
             DATA_GO_TH_API_URL,
@@ -122,8 +124,7 @@ def get_zoo_visitors(limit: Optional[int] = Query(default=None)):
             records = load_local_csv()
             source_mode = f"Local Resource File ({RESOURCE_FILE_PATH})"
         except Exception as e:
-            # คืนค่า Error Detail แบบชัดเจนออกมาให้ทราบหากเกิดปัญหา
-            raise HTTPException(status_code=500, detail=f"Data Load Error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"เกิดข้อผิดพลาดในการโหลดไฟล์ CSV: {str(e)}")
 
     total = len(records)
     if limit and limit > 0:
