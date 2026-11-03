@@ -28,7 +28,7 @@ DATA_GO_TH_API_URL = "https://data.go.th/api/3/action/datastore_search"
 
 
 def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
-    """ทำความสะอาด DataFrame และแมปชื่อคอลัมน์มาตรฐาน"""
+    """ทำความสะอาด DataFrame และแมปชื่อคอลัมน์มาตรฐานพร้อมเพิ่มฟิลด์ province"""
     df = df.dropna(how='all', axis=1)
 
     column_mapping = [
@@ -45,7 +45,7 @@ def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
         if df[col].dtype == object:
             df[col] = df[col].astype(str).str.strip()
 
-    # เพิ่มข้อมูลจังหวัด (Province)
+    # แมปข้อมูลจังหวัด
     df["province"] = df["zoo_name"].map(lambda x: PROVINCE_MAP.get(str(x), "ไม่ระบุ"))
 
     return df.where(pd.notnull(df), None).to_dict(orient="records")
@@ -55,7 +55,6 @@ def load_local_csv() -> List[Dict[str, Any]]:
     """อ่านข้อมูลไฟล์ CSV โดยค้นหาไฟล์อัตโนมัติในโฟลเดอร์"""
     target_path = RESOURCE_FILE_PATH
     if not os.path.exists(target_path):
-        # ค้นหาไฟล์ .csv ในโฟลเดอร์ปัจจุบัน
         csv_files = [f for f in os.listdir('.') if f.endswith('.csv')]
         if csv_files:
             target_path = csv_files[0]
