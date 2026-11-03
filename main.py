@@ -13,15 +13,23 @@ DATASET_METADATA = {
     "url": "https://data.go.th/dataset/zoo-visitors2569"
 }
 
+PROVINCE_MAP = {
+    "สวนสัตว์เปิดเขาเขียว": "ชลบุรี",
+    "สวนสัตว์เชียงใหม่": "เชียงใหม่",
+    "สวนสัตว์นครราชสีมา": "นครราชสีมา",
+    "สวนสัตว์สงขลา": "สงขลา",
+    "สวนสัตว์อุบลราชธานี": "อุบลราชธานี",
+    "สวนสัตว์ขอนแก่น": "ขอนแก่น",
+    "โครงการคชอาณาจักร จังหวัดสุรินทร์": "สุรินทร์"
+}
+
 RESOURCE_FILE_PATH = "csv-.-..69.csv"
 DATA_GO_TH_API_URL = "https://data.go.th/api/3/action/datastore_search"
 
 
 def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
-    # ลบคอลัมน์ที่เป็น NaN ทั้งหมดออก
     df = df.dropna(how='all', axis=1)
 
-    # แมปชื่อคอลัมน์มาตรฐาน
     column_mapping = [
         "item_type", "zoo_name", "fiscal_year",
         "oct_68", "nov_68", "dec_68", "jan_69", "feb_69",
@@ -36,6 +44,9 @@ def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
         if df[col].dtype == object:
             df[col] = df[col].astype(str).str.strip()
 
+    # เพิ่มข้อมูลจังหวัด (Province)
+    df["province"] = df["zoo_name"].map(lambda x: PROVINCE_MAP.get(str(x), "ไม่ระบุ"))
+
     return df.where(pd.notnull(df), None).to_dict(orient="records")
 
 
@@ -43,7 +54,6 @@ def load_local_csv() -> List[Dict[str, Any]]:
     if not os.path.exists(RESOURCE_FILE_PATH):
         raise FileNotFoundError(f"ไม่พบไฟล์ทรัพยากร {RESOURCE_FILE_PATH}")
     
-    # อ่านไฟล์ UTF-8 ที่แก้ไขแล้ว
     try:
         df = pd.read_csv(RESOURCE_FILE_PATH, encoding='utf-8-sig')
     except Exception:
