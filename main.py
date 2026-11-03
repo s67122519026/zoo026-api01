@@ -13,18 +13,21 @@ DATASET_METADATA = {
     "url": "https://data.go.th/dataset/zoo-visitors2569"
 }
 
-# กำหนดชื่อไฟล์ให้ตรงกับไฟล์ CSV บน GitHub
 RESOURCE_FILE_PATH = "csv-.-..69.csv"
 DATA_GO_TH_API_URL = "https://data.go.th/api/3/action/datastore_search"
 
 
 def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    # ลบคอลัมน์ที่เป็น NaN ทั้งหมดออก
     df = df.dropna(how='all', axis=1)
+
+    # แมปชื่อคอลัมน์มาตรฐาน
     column_mapping = [
         "item_type", "zoo_name", "fiscal_year",
         "oct_68", "nov_68", "dec_68", "jan_69", "feb_69",
         "mar_69", "apr_69", "may_69", "jun_69", "jul_69", "aug_69", "sep_69"
     ]
+
     if len(df.columns) >= len(column_mapping):
         df = df.iloc[:, :len(column_mapping)]
         df.columns = column_mapping
@@ -38,17 +41,14 @@ def clean_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
 
 def load_local_csv() -> List[Dict[str, Any]]:
     if not os.path.exists(RESOURCE_FILE_PATH):
-        raise FileNotFoundError(f"ไม่พบไฟล์ {RESOURCE_FILE_PATH}")
+        raise FileNotFoundError(f"ไม่พบไฟล์ทรัพยากร {RESOURCE_FILE_PATH}")
     
-    for enc in ['cp874', 'utf-8-sig', 'tis-620', 'utf-8']:
-        try:
-            df = pd.read_csv(RESOURCE_FILE_PATH, encoding=enc)
-            if df.columns[0] and '?' not in str(df.columns[0]):
-                return clean_dataframe(df)
-        except Exception:
-            continue
-
-    df = pd.read_csv(RESOURCE_FILE_PATH)
+    # อ่านไฟล์ UTF-8 ที่แก้ไขแล้ว
+    try:
+        df = pd.read_csv(RESOURCE_FILE_PATH, encoding='utf-8-sig')
+    except Exception:
+        df = pd.read_csv(RESOURCE_FILE_PATH, encoding='utf-8')
+        
     return clean_dataframe(df)
 
 
